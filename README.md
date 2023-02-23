@@ -6,9 +6,9 @@ Develop a web application that illustrates multi-channel signal viewer that has 
 - The user can browse his PC to open any signal file. Each group will need to provide samples from three different
 medical signals (e.g. ECG, EMG, EEG,…etc). Each signal type should have an example for normal signal and abnormal
 signal.
+
 - Your application should contain two main identical graphs. The user can open different signals in each graph. i.e. each
-graph has to have its own controls. The user can run each graph independently or link both graphs via a button in the
-UI. When the graphs are linked, the two graphs must display the same time frames, signal speed, and same viewport if
+graph has to have its own controls. The user can run each graph independently or link both graphs via a button in the UI. When the graphs are linked, the two graphs must display the same time frames, signal speed, and same viewport if
 zoomed or panned (i.e. if the user zoom on one graph, the other graph should apply the same exact zoom as well). If
 the link of the two graphs is disabled, then each graph can run its signals independently.
 
@@ -38,17 +38,17 @@ manipulations will be applied on all the opened signals (viewed or hidden).
 
 ## TODO
 - [x] Create a new repository
-- [x] Make two graphs
+- [ ] Make two graphs
 - [x] Make a button to open a file
     - [x] Make sure the file is a csv file
-- [x] Make a button to link the graphs
-- [x] Make a button to unlink the graphs
-- [x] Make a button to change the color of the graph
-- [x] Make a button to add a label to the graph
-- [x] Make a button to show/hide the graph
-- [x] Make a button to control the speed of the graph
-- [x] Make a button to zoom in/out the graph
-- [x] Make a button to pause/play the graph
-- [x] Make a button to rewind the graph
-- [x] Make a button to scroll the graph
+- [ ] Make a button to link the graphs
+- [ ] Make a button to unlink the graphs
+- [ ] Make a button to change the color of the graph
+- [ ] Make a button to add a label to the graph
+- [ ] Make a button to show/hide the graph
+- [ ] Make a button to control the speed of the graph
+- [ ] Make a button to zoom in/out the graph
+- [ ] Make a button to pause/play the graph
+- [ ] Make a button to rewind the graph
+- [ ] Make a button to scroll the graph
 
