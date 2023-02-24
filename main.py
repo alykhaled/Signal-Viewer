@@ -1,57 +1,153 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-st.set_page_config(page_title="Signal Viewer", layout="wide", initial_sidebar_state="expanded")
-
-signal = None
-slide = None
-def body():
-    sidebar()
-    st.title("Signal Viewer")
-    st.write(slide)
-    # Plot signal
-    draw_signal()
-    
-
-def draw_signal():
-    global signal
-    if signal is not None:
-        df = pd.read_csv(signal,delimiter=" ")
-        fig = plt.figure()
-        # Make figure transparent
-        fig.patch.set_facecolor("#00000000")
-        # Make axes dark
-        ax = fig.add_subplot(111)
-        ax.set_facecolor("#00000000")
-        # Make ticks dark
-        ax.tick_params(axis="x", colors="#d9d9d9")
-        ax.tick_params(axis="y", colors="#d9d9d9")
-        # Make labels dark
-        ax.xaxis.label.set_color("#d9d9d9")
-        ax.yaxis.label.set_color("#d9d9d9")
-        # Make title dark
-        ax.title.set_color("#d9d9d9")
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Signal")
-        ax.set_title("Signal")
-        # Get first column as time
-        time = df.iloc[:, 0]
-        time = time.to_numpy()
-        # Get second column as signal
-        signal = df.iloc[:, 1]
-        signal = signal.to_numpy()
-        plt.plot(time, signal)
-        st.pyplot(fig)
+import plotly.graph_objs as go
 
 
+# signal = {
+#     data: data
+#     color: color
+#     label: label
+#     visible: visible
+# }
+
+# graph = {
+#     data: [signal]
+#     speed: speed
+#     scroll: scroll
+#     zoom: zoom
+# }
+
+# firstGraph = {
+#     'data': [],
+#     'speed': 1,
+#     'scroll': 0,
+#     'zoom': 1
+# }
+
+secondGraph = {
+    'data': [],
+    'speed': 1,
+    'scroll': 0,
+    'zoom': 1
+}
+
+def updateSignal():
+    st.session_state.selectedSignal['color'] = st.session_state.color
+    st.session_state.selectedSignal['label'] = st.session_state.label
+    st.session_state.selectedSignal['visible'] = st.session_state.visible
+
+def updateGraph():
+    st.session_state.firstGraph['speed'] = st.session_state.speed
+    st.session_state.firstGraph['scroll'] = st.session_state.scroll
+    st.session_state.firstGraph['zoom'] = st.session_state.zoom
 
 def sidebar():
-    st.sidebar.header("Signal")
-    global slide
-    slide = st.sidebar.slider("Speed", 0, 100, 50)
-    global signal
-    signal = st.sidebar.file_uploader("browse", type=["csv"], label_visibility="collapsed")
+    tab1, tab2 = st.sidebar.tabs(['First Graph', 'Second Graph'])
+    
+    # global firstGraph
+    if 'signals' not in st.session_state:
+        st.session_state.signals = []
+    
+    if 'selectedSignal' not in st.session_state:
+        st.session_state.selectedSignal = {
+                                            'data': [],
+                                            'color': '#000000',
+                                            'label': 'Signal 1',
+                                            'visible': True
+                                            }
+    
+    if 'firstGraph' not in st.session_state:
+        st.session_state.firstGraph = {
+                                        'data': [],
+                                        'speed': 1,
+                                        'scroll': 0,
+                                        'zoom': 1
+                                    }
+    firstGraph = st.session_state.firstGraph
+    tab1.write('Upload Signal')
+    uploaded_file = tab1.file_uploader("Choose a file", type="csv")
+    if uploaded_file is not None:
+        if uploaded_file not in st.session_state.signals:
+            st.session_state.signals.append(uploaded_file)
+            signal = {
+                'data': pd.read_csv(uploaded_file),
+                'color': '#000000',
+                'label': 'Signal ' + str(len(firstGraph['data']) + 1),
+                'visible': True
+            }
+            st.session_state.firstGraph['data'].append(signal)
 
+    # st.write(st.session_state.firstGraph)
 
-body()
+    
+    tab1.header('Signal Settings')
+    labels = [signal['label'] for signal in firstGraph['data']]
+    selectedSignalLabel = tab1.selectbox('Select Signal', labels)
+
+    for signal in firstGraph['data']:
+        if signal['label'] == selectedSignalLabel:
+            st.session_state.selectedSignal = signal
+            break
+
+    # st.write(st.session_state.selectedSignal)
+    # Change label then update the selectbox session state
+    label = tab1.text_input('Label', value=selectedSignalLabel, key="label", on_change=updateSignal)
+
+    # Change color then update the selectbox session state
+    color = tab1.color_picker('Color', value=st.session_state.selectedSignal['color'], key="color", on_change=updateSignal)
+
+    # Change visibility then update the selectbox session state
+    visible = tab1.checkbox('Visible', value=st.session_state.selectedSignal['visible'], key="visible", on_change=updateSignal)
+
+    tab1.header('Graph Settings')
+    speed = tab1.slider('Speed', min_value=1, max_value=10, value=st.session_state.firstGraph['speed'], key="speed", on_change=updateGraph)
+    scroll = tab1.slider('Scroll', min_value=0, max_value=100, value=st.session_state.firstGraph['scroll'], key="scroll", on_change=updateGraph)
+    zoom = tab1.slider('Zoom', min_value=1, max_value=10, value=st.session_state.firstGraph['zoom'], key="zoom", on_change=updateGraph)
+    
+    with tab2:
+        st.write('Signal Graph 2')
+
+def drawGraph():
+    # global firstGraph
+    firstGraph = st.session_state.firstGraph
+    # st.write(firstGraph)
+    data = []
+    for signal in firstGraph['data']:
+        trace = go.Scatter(
+            x=signal['data']['Time'],
+            y=signal['data']['Signal'],
+            mode='lines',
+            name=signal['label'],
+            line=dict(color=signal['color'], width=2),
+            visible=signal['visible']
+        )
+        data.append(trace)
+    
+    layout = go.Layout(
+        xaxis=dict(
+            title='Time',
+            titlefont=dict(
+                family='Courier New, monospace',
+                size=18,
+                color='#7f7f7f'
+            )
+        ),
+        yaxis=dict(
+            title='Value',
+            titlefont=dict(
+                family='Courier New, monospace',
+                size=18,
+                color='#7f7f7f'
+            )
+        )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    st.plotly_chart(fig, use_container_width=True)
+
+def main():
+    st.title('Signal Viewer :heart:')
+    sidebar()
+    drawGraph()
+
+if __name__ == '__main__':
+    main()
