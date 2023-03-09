@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objs as go
-
+import numpy as np
+import altair as alt
+import time
+import threading
 
 # signal = {
 #     data: data
@@ -31,20 +33,71 @@ secondGraph = {
     'zoom': 1
 }
 
-def updateSignal():
-    st.session_state.selectedSignal['color'] = st.session_state.color
-    st.session_state.selectedSignal['label'] = st.session_state.label
-    st.session_state.selectedSignal['visible'] = st.session_state.visible
+def updateSignal(graphName):
+    st.session_state.selectedSignal['color'] = st.session_state['color'+graphName]
+    st.session_state.selectedSignal['label'] = st.session_state['label'+graphName]
+    st.session_state.selectedSignal['visible'] = st.session_state['visible'+graphName]
 
-def updateGraph():
-    st.session_state.firstGraph['speed'] = st.session_state.speed
-    st.session_state.firstGraph['scroll'] = st.session_state.scroll
-    st.session_state.firstGraph['zoom'] = st.session_state.zoom
+def updateGraph(graphName):
+    st.session_state[graphName]['speed'] = st.session_state['speed'+graphName]
+    st.session_state[graphName]['scroll'] = st.session_state['scroll'+graphName]
+    st.session_state[graphName]['zoom'] = st.session_state['zoom'+graphName]
+    st.session_state[graphName]['play'] = st.session_state['play'+graphName]
+
+
+def tabs(tab,graph):
+
+    graphName = graph
+    graph = st.session_state[graph]
+    tab.write('Upload Signal')
+    uploaded_file = tab.file_uploader("Choose a file", type="csv", key="file"+graphName)
+    if uploaded_file is not None:
+        if uploaded_file not in st.session_state.signals:
+            st.session_state.signals.append(uploaded_file)
+            signal = {
+                'data': pd.read_csv(uploaded_file),
+                'color': '#000000',
+                'label': 'Signal ' + str(len(graph['data']) + 1),
+                'visible': True
+            }
+            st.session_state[graphName]['data'].append(signal)
+
+    tab.header('Signal Settings')
+    labels = [signal['label'] for signal in graph['data']]
+    selectedSignalLabel = tab.selectbox('Select Signal', labels, key="selectSignal"+graphName, args=(graphName,))
+
+    for signal in graph['data']:
+        if signal['label'] == selectedSignalLabel:
+            st.session_state.selectedSignal = signal
+            break
+
+    # st.write(st.session_state.selectedSignal)
+    # Change label then update the selectbox session state
+    label = tab.text_input('Label', value=selectedSignalLabel, key="label"+graphName, on_change=updateSignal, args=(graphName,))
+
+    # Change color then update the selectbox session state
+    color = tab.color_picker('Color', value=st.session_state.selectedSignal['color'], key="color"+graphName, on_change=updateSignal, args=(graphName,))
+
+    # Change visibility then update the selectbox session state
+    visible = tab.checkbox('Visible', value=st.session_state.selectedSignal['visible'], key="visible"+graphName, on_change=updateSignal, args=(graphName,))
+
+    tab.header('Graph Settings')
+    if len(graph['data']) > 0:
+        maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
+    else:
+        maxSignalsTime = 0
+    maxScroll = maxSignalsTime - graph['zoom']
+    speed = tab.slider('Speed', min_value=1, max_value=10, value=st.session_state["firstGraph"]['speed'], key="speed"+graphName, on_change=updateGraph, args=(graphName,))
+    scroll = tab.slider('Scroll', min_value=0, max_value=int(maxScroll+2), value=st.session_state["firstGraph"]['scroll'], key="scroll"+graphName, on_change=updateGraph, args=(graphName,))
+    zoom = tab.slider('Zoom', min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state["firstGraph"]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
+    
+    play = tab.checkbox('Play', value=st.session_state["firstGraph"]['play'], key="play"+graphName, on_change=updateGraph, args=(graphName,))
 
 def sidebar():
     tab1, tab2 = st.sidebar.tabs(['First Graph', 'Second Graph'])
     
     # global firstGraph
+
     if 'signals' not in st.session_state:
         st.session_state.signals = []
     
@@ -64,155 +117,91 @@ def sidebar():
                                         'zoom': 1,
                                         'play': False,
                                     }
-    firstGraph = st.session_state.firstGraph
-    tab1.write('Upload Signal')
-    uploaded_file = tab1.file_uploader("Choose a file", type="csv")
-    if uploaded_file is not None:
-        if uploaded_file not in st.session_state.signals:
-            st.session_state.signals.append(uploaded_file)
-            signal = {
-                'data': pd.read_csv(uploaded_file),
-                'color': '#000000',
-                'label': 'Signal ' + str(len(firstGraph['data']) + 1),
-                'visible': True
-            }
-            st.session_state.firstGraph['data'].append(signal)
-
-    # st.write(st.session_state.firstGraph)
-
     
-    tab1.header('Signal Settings')
-    labels = [signal['label'] for signal in firstGraph['data']]
-    selectedSignalLabel = tab1.selectbox('Select Signal', labels)
+    if 'secondGraph' not in st.session_state:
+        st.session_state.secondGraph = {
+                                        'data': [],
+                                        'speed': 1,
+                                        'scroll': 0,
+                                        'zoom': 1,
+                                        'play': False,
+                                    }
 
-    for signal in firstGraph['data']:
-        if signal['label'] == selectedSignalLabel:
-            st.session_state.selectedSignal = signal
-            break
-
-    # st.write(st.session_state.selectedSignal)
-    # Change label then update the selectbox session state
-    label = tab1.text_input('Label', value=selectedSignalLabel, key="label", on_change=updateSignal)
-
-    # Change color then update the selectbox session state
-    color = tab1.color_picker('Color', value=st.session_state.selectedSignal['color'], key="color", on_change=updateSignal)
-
-    # Change visibility then update the selectbox session state
-    visible = tab1.checkbox('Visible', value=st.session_state.selectedSignal['visible'], key="visible", on_change=updateSignal)
-
-    tab1.header('Graph Settings')
-    if len(firstGraph['data']) > 0:
-        maxSignalsTime = max([signal['data']['Time'].max() for signal in firstGraph['data']])
-    else:
-        maxSignalsTime = 0
-    maxScroll = maxSignalsTime - firstGraph['zoom']
-    speed = tab1.slider('Speed', min_value=1, max_value=10, value=st.session_state.firstGraph['speed'], key="speed", on_change=updateGraph)
-    scroll = tab1.slider('Scroll', min_value=0, max_value=int(maxScroll+1), value=st.session_state.firstGraph['scroll'], key="scroll", on_change=updateGraph)
-    zoom = tab1.slider('Zoom', min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state.firstGraph['zoom'], key="zoom", on_change=updateGraph)
-    
-    play = tab1.button('Play')
-    if play:
-        st.session_state.firstGraph['play'] = True
-    with tab2:
-        st.write('Signal Graph 2')
-
-def drawGraph():
     firstGraph = st.session_state.firstGraph
+    secondGraph = st.session_state.secondGraph
+
+    tabs(tab1,'firstGraph')
+    tabs(tab2,'secondGraph')
+
+def drawGraph(graph):
+    graphName = graph
+    graph = st.session_state[graph]
+
+    if len(graph['data']) == 0:
+        st.write('No signals to plot')
+        return
 
     frames = []
-    zoom    = firstGraph['zoom']
-    scroll  = firstGraph['scroll']
-    speed   = firstGraph['speed']
-    for signal in firstGraph['data']:
-        frame = go.Frame(
-            data=[
-                go.Scatter(
-                    x=signal['data']['Time'][scroll:scroll+zoom],
-                    y=signal['data']['Signal'][scroll:scroll+zoom],
-                    mode='lines',
-                    name=signal['label'],
-                    line=dict(color=signal['color'], width=2),
-                    visible=signal['visible']
-                )
-            ],
-            traces=[0],
-            name=signal['label']
-        )
-        frames.append(frame)
+    zoom    = graph['zoom']
+    scroll  = graph['scroll']
+    speed   = graph['speed']
 
-    # Run the animation without the controls
-    # fig = go.Figure(
-    #     data=[
-    #         go.Scatter(
-    #             x=firstGraph['data'][0]['data']['Time'][scroll:scroll+zoom],
-    #             y=firstGraph['data'][0]['data']['Signal'][scroll:scroll+zoom],
-    #             mode='lines',
-    #             name=firstGraph['data'][0]['label'],
-    #             line=dict(color=firstGraph['data'][0]['color'], width=2),
-    #             visible=firstGraph['data'][0]['visible']
-    #         )
-    #     ],
-    #     layout=go.Layout(
-    #         xaxis=dict(
-    #             title='Time',
-    #             titlefont=dict(
-    #                 family='Courier New, monospace',
-    #                 size=18,
-    #                 color='#7f7f7f'
-    #             ),
-    #             range=[scroll, scroll+zoom]
-    #         ),
-    #         yaxis=dict(
-    #             title='Signal',
-    #             titlefont=dict(
-    #                 family='Courier New, monospace',
-    #                 size=18,
-    #                 color='#7f7f7f'
-    #             )
-    #         )
-    #     ),
-    #     frames=frames
-    # )
+    play = graph['play']
+    # Convert the data to a dataframe
+    df = pd.DataFrame()
+    currentDf = df
+    for i in range(len(graph['data'])):
+        signal = graph['data'][i]
+        if signal['visible']:
+            df = signal['data']
+            df['Label'] = signal['label']
+            df['Color'] = signal['color']
+            currentDf = df[(df['Time'] >= scroll) & (df['Time'] <= scroll+zoom)]
+            frames.append(currentDf)
 
+    currentDf = pd.concat(frames)
 
-    data = []
-    for signal in firstGraph['data']:
-        trace = go.Scatter(
-            x=signal['data']['Time'],
-            y=signal['data']['Signal'],
-            mode='lines',
-            name=signal['label'],
-            line=dict(color=signal['color'], width=2),
-            visible=signal['visible']
-        )
-        data.append(trace)
-    
-    layout = go.Layout(
-        xaxis=dict(
-            title='Time',
-            titlefont=dict(
-                family='Courier New, monospace',
-                size=18,
-                color='#7f7f7f'
-            ),
-            range=[scroll, scroll+zoom]
-        ),
-        yaxis=dict(
-            title='Signal',
-            titlefont=dict(
-                family='Courier New, monospace',
-                size=18,
-                color='#7f7f7f'
-            )
-        )
+    lines = alt.Chart(currentDf).mark_line().encode(
+        x=alt.X('Time:Q', scale=alt.Scale(domain=(scroll, scroll+zoom))),
+        y=alt.Y('Signal:Q'),
+        color=alt.Color('Label:N', scale=alt.Scale(scheme='tableau20')),
+        tooltip=['Label', 'Time', 'Signal']
+    ).properties(
+        width=900,
+        height=500
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    line_plot = st.altair_chart(lines)
+    if len(graph['data']) > 0:
+        maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
+    else:
+        maxSignalsTime = 0
+    maxScroll = maxSignalsTime - graph['zoom']
+    if play:
+        # Increase the time by 0.1 second
+
+        for i in range(int(maxScroll+1) - scroll):
+            scroll = scroll + 0.01
+            st.session_state[graphName]['scroll'] = scroll
+            currentDf = df[(df['Time'] >= scroll) & (df['Time'] <= scroll+zoom)]
+            lines = alt.Chart(currentDf).mark_line().encode(
+                x=alt.X('Time:Q', scale=alt.Scale(domain=(scroll, scroll+zoom))),
+                y=alt.Y('Signal:Q'),
+                color=alt.Color('Label:N', scale=alt.Scale(scheme='tableau20')),
+                tooltip=['Label', 'Time', 'Signal']
+            ).properties(
+                width=900,
+                height=500
+            )
+            line_plot.altair_chart(lines)
+            time.sleep(1/speed)
+
+        
 
 def main():
     st.title('Signal Viewer :heart:')
     sidebar()
-    drawGraph()
-
+    drawGraph("firstGraph")
+    drawGraph("secondGraph")
 if __name__ == '__main__':
     main()
