@@ -38,17 +38,17 @@ manipulations will be applied on all the opened signals (viewed or hidden).
 
 ## TODO
 - [x] Create a new repository
-- [ ] Make two graphs
+- [x] Make two graphs
 - [x] Make a button to open a file
     - [x] Make sure the file is a csv file
-- [ ] Make a button to link the graphs
-- [ ] Make a button to unlink the graphs
-- [ ] Make a button to change the color of the graph
-- [ ] Make a button to add a label to the graph
-- [ ] Make a button to show/hide the graph
-- [ ] Make a button to control the speed of the graph
-- [ ] Make a button to zoom in/out the graph
-- [ ] Make a button to pause/play the graph
-- [ ] Make a button to rewind the graph
-- [ ] Make a button to scroll the graph
+- [x] Make a button to link the graphs
+- [x] Make a button to unlink the graphs
+- [x] Make a button to change the color of the graph
+- [x] Make a button to add a label to the graph
+- [x] Make a button to show/hide the graph
+- [x] Make a button to control the speed of the graph
+- [x] Make a button to zoom in/out the graph
+- [x] Make a button to pause/play the graph
+- [x] Make a button to rewind the graph
+- [x] Make a button to scroll the graph
 
