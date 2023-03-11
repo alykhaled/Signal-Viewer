@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-# import altair as alt
 import time
-import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+import altair as alt
+import plotly.express as px
+import plotly.graph_objects as go
 
 # signal = {
 #     data: data
@@ -20,16 +22,16 @@ import plotly.graph_objs as go
 # }
 
 def updateSignal(graphName):
-    st.session_state.selectedSignal['color'] = st.session_state['color'+graphName]
-    st.session_state.selectedSignal['label'] = st.session_state['label'+graphName]
-    st.session_state.selectedSignal['visible'] = st.session_state['visible'+graphName]
+    st.session_state['selectedSignal'+graphName]['color'] = st.session_state['color'+graphName]
+    st.session_state['selectedSignal'+graphName]['label'] = st.session_state['label'+graphName]
+    st.session_state['selectedSignal'+graphName]['visible'] = st.session_state['visible'+graphName]
 
 def updateGraph(graphName):
     linking = st.session_state['linkGraphs']
     if linking:
         for graph in ['firstGraph','secondGraph']:
             st.session_state[graph]['speed'] = st.session_state['speed'+graph]
-            st.session_state[graph]['scroll'] = st.session_state['scroll'+graph] 
+            st.session_state[graph]['scroll'] = st.session_state['scroll'+graph]  if 'scroll'+graph in st.session_state else 0
             st.session_state[graph]['zoom'] = st.session_state['zoom'+graph] 
             st.session_state[graph]['play'] = st.session_state['play'+graph]
     else:
@@ -60,14 +62,14 @@ def tabs(tab,graph):
 
     for signal in graph['data']:
         if signal['label'] == selectedSignalLabel:
-            st.session_state.selectedSignal = signal
+            st.session_state['selectedSignal'+graphName] = signal
             break
     
     label = tab.text_input('Label', value=selectedSignalLabel, key="label"+graphName, on_change=updateSignal, args=(graphName,))
 
-    color = tab.color_picker('Color', value=st.session_state.selectedSignal['color'], key="color"+graphName, on_change=updateSignal, args=(graphName,))
+    color = tab.color_picker('Color', value=st.session_state['selectedSignal'+graphName]['color'], key="color"+graphName, on_change=updateSignal, args=(graphName,))
 
-    visible = tab.checkbox('Visible', value=st.session_state.selectedSignal['visible'], key="visible"+graphName, on_change=updateSignal, args=(graphName,))
+    visible = tab.checkbox('Visible', value=st.session_state['selectedSignal'+graphName]['visible'], key="visible"+graphName, on_change=updateSignal, args=(graphName,))
 
     linking = st.session_state['linkGraphs']
        
@@ -79,7 +81,7 @@ def tabs(tab,graph):
 
     maxScroll = maxSignalsTime - graph['zoom']
     speed = tab.slider('Speed', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=10, value=st.session_state[graphName]['speed'], key="speed"+graphName, on_change=updateGraph, args=(graphName,))
-    scroll = tab.slider('Scroll',disabled= (linking and graphName == 'secondGraph'), min_value=0.0, max_value=float(maxScroll+2), value=float(st.session_state[graphName]['scroll']), key="scroll"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
+    scroll = tab.slider('Scroll',disabled= (linking and graphName == 'secondGraph'), min_value=0.0, max_value=float(maxScroll+1.1), value=float(st.session_state[graphName]['scroll']), key="scroll"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
     zoom = tab.slider('Zoom', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state[graphName]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
     play = tab.checkbox('Play', disabled= (linking and graphName == 'secondGraph'),  value=st.session_state[graphName]['play'], key="play"+graphName, on_change=updateGraph, args=(graphName,))
 
@@ -87,8 +89,16 @@ def sidebar():
     if 'signals' not in st.session_state:
         st.session_state.signals = []
     
-    if 'selectedSignal' not in st.session_state:
-        st.session_state.selectedSignal = {
+    if 'selectedSignalFirstGraph' not in st.session_state:
+        st.session_state.selectedSignalfirstGraph = {
+                                            'data': [],
+                                            'color': '#000000',
+                                            'label': 'Signal 1',
+                                            'visible': True
+                                            }
+
+    if 'selectedSignalSecondGraph' not in st.session_state:
+        st.session_state.selectedSignalsecondGraph = {
                                             'data': [],
                                             'color': '#000000',
                                             'label': 'Signal 1',
@@ -130,7 +140,7 @@ def drawGraph():
         firstScroll  = firstGraph['scroll']
         firstSpeed   = firstGraph['speed']
 
-        drawPlot('firstGraph', False)
+        drawPlot('firstGraph', True)
         drawPlot('secondGraph', True, firstZoom, firstScroll, firstSpeed)
 
         if len(firstGraph['data']) > 0:
@@ -161,39 +171,41 @@ def drawGraph():
         drawPlot('firstGraph', False)
         drawPlot('secondGraph', False)
 
+def animate(df):
+    lines = alt.Chart(df).mark_line().encode(
+        x=alt.X('Time', scale=alt.Scale(zero=False, domain=(scroll, scroll+zoom))),
+        y=alt.Y('Signal', scale=alt.Scale(zero=False))
+    ).properties(
+        width=800,
+        height=400
+    )
+
 def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0):
     graph = st.session_state[graphName]
     if len(graph['data']) == 0:
         st.write('No signals to plot')
         return
 
-    if not linking:
+    if not linking or graphName == 'firstGraph':
         zoom = graph['zoom']
         scroll = graph['scroll']
         speed = graph['speed']
-    
+
+    # Using plotly
     fig = go.Figure()
     for signal in graph['data']:
-        if signal['visible']:
-            fig.add_trace(go.Scatter(x=signal['data']['Time'], y=signal['data']['Signal'], name=signal['label'], line=dict(color=signal['color'])))
-        
-    # Add animation controls
+        fig.add_trace(go.Scatter(x=signal['data']['Time'], y=signal['data']['Signal'], name=signal['label'], visible=signal['visible'], line=dict(color=signal['color'])))
+    
     fig.update_layout(
         xaxis=dict(
             range=[scroll, scroll+zoom],
-            tickformat = '.2f',
-            tickmode = 'linear',
-            tick0 = 0,
-            dtick = 0.1
+            constrain='domain'
         ),
-        yaxis=dict(
-            tickformat = '.2f',
-            tickmode = 'linear',
-            tick0 = 0,
-            dtick = 0.1
-        )
+        width=800,
+        height=400
     )
-    st.plotly_chart(fig, use_container_width=True, sharing='streamlit', key=graphName)
+    st.plotly_chart(fig, use_container_width=True)
+
 
     if len(graph['data']) > 0:
         maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
@@ -204,7 +216,7 @@ def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0):
     if graph['play'] and not linking:
         time.sleep(1/speed)
         if graph['scroll'] < maxScroll:
-            st.session_state[graphName]['scroll'] += speed
+            st.session_state[graphName]['scroll'] += 0.1
         else:
             st.session_state[graphName]['play'] = False
         st.experimental_rerun()
