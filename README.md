@@ -51,4 +51,7 @@ manipulations will be applied on all the opened signals (viewed or hidden).
 - [x] Make a button to pause/play the graph
 - [x] Make a button to rewind the graph
 - [x] Make a button to scroll the graph
+- [x] Make a PDF File with signals describtions(Stastical Wise)
+
+
 
