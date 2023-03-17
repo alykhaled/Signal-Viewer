@@ -20,14 +20,17 @@ from fpdf import FPDF
 #     scroll: scroll
 #     zoom: zoom
 # }
-
+ 
+# Update Signal is called when a signal setting is changed
 def updateSignal(graphName):
     st.session_state['selectedSignal'+graphName]['color'] = st.session_state['color'+graphName]
     st.session_state['selectedSignal'+graphName]['label'] = st.session_state['label'+graphName]
     st.session_state['selectedSignal'+graphName]['visible'] = st.session_state['visible'+graphName]
 
+
+#updateGraph is called when a graph setting is changed
 def updateGraph(graphName):
-    linking = st.session_state['linkGraphs']
+    linking = st.session_state['linkGraphs'] #linking is used to determine if the graphs are linked
     if linking:
         for graph in ['firstGraph','secondGraph']:
             st.session_state[graph]['speed'] = st.session_state['speed'+graph]
@@ -39,12 +42,13 @@ def updateGraph(graphName):
         st.session_state[graphName]['scroll'] = st.session_state['scroll'+graphName] if 'scroll'+graphName in st.session_state else 0
         st.session_state[graphName]['zoom'] = st.session_state['zoom'+graphName]
         st.session_state[graphName]['play'] = st.session_state['play'+graphName]
-        
+
+#tabs is used to create the tabs for the sidebar       
 def tabs(tab,graph):
     graphName = graph
-    graph = st.session_state[graph]
+    graph = st.session_state[graph] #session state is used to store the graph settings and signals
 
-    tab.write('Upload Signal')
+    tab.write('Upload Signal') #tab.write is used to write text to the sidebar
     uploaded_file = tab.file_uploader("Choose a file", type="csv", key="file"+graphName)
     if uploaded_file is not None:
         if uploaded_file not in st.session_state.signals:
@@ -61,7 +65,7 @@ def tabs(tab,graph):
     tab.header('Signal Settings')
     labels = [signal['label'] for signal in graph['data']]
     selectedSignalLabel = tab.selectbox('Select Signal', labels, key="selectSignal"+graphName, args=(graphName,))
-
+    #for loop is used to find the selected signal
     for signal in graph['data']:
         if signal['label'] == selectedSignalLabel:
             st.session_state['selectedSignal'+graphName] = signal
@@ -75,6 +79,7 @@ def tabs(tab,graph):
     tab.header('Graph Settings')
     linking = st.session_state['linkGraphs']
     maxSignalsTime = 0
+    #checking if there are any signals in the graph
     if len(graph['data']) > 0:
         maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
     maxScroll = getMaxScroll(graph)
@@ -83,9 +88,11 @@ def tabs(tab,graph):
     zoom = tab.slider('Zoom', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state[graphName]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
     play = tab.checkbox('Play', disabled= (linking and graphName == 'secondGraph'),  value=st.session_state[graphName]['play'], key="play"+graphName, on_change=updateGraph, args=(graphName,))
 
-def sidebar():
-    if 'signals' not in st.session_state:
-        st.session_state.signals = []
+#sidebar is used to create the sidebar
+def sidebar(): 
+
+    if 'signals' not in st.session_state: #checking if signals not in the session state
+        st.session_state.signals = [] #creating a list of signals in the session state
     
     if 'selectedSignalFirstGraph' not in st.session_state:
         st.session_state.selectedSignalfirstGraph = {
@@ -151,7 +158,7 @@ def getGraphData(data):
     return mean,std,duration,minData,maxData
     
 
-def createPDF(firstGraphData, secondGraphData):
+def createPDF(firstGraphData, secondGraphData): #creating a pdf file with the data of the graphs
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -165,7 +172,8 @@ def createPDF(firstGraphData, secondGraphData):
     pdf.cell(40, 10, txt="Min", ln=0, align="L")
     pdf.cell(40, 10, txt="Max", ln=1, align="L")
     signalNames = [signal['label'] for signal in firstGraphData]
-    for i in range(len(mean)):
+
+    for i in range(len(mean)):# Looping over the mean of the signals
         pdf.cell(40, 10, txt=str(signalNames[i]), ln=0, align="L")
         pdf.cell(40, 10, txt=str(mean[i]), ln=0, align="L")
         pdf.cell(40, 10, txt=str(std[i]), ln=0, align="L")
@@ -206,7 +214,7 @@ def createPDF(firstGraphData, secondGraphData):
     pdf.output("report.pdf")
 
 
-def getMaxScroll(graph):
+def getMaxScroll(graph): # Returns the maximum scroll value for a graph to prevent scrolling past the end of the data
     if len(graph['data']) > 0:
         maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
     else:
@@ -214,21 +222,21 @@ def getMaxScroll(graph):
     maxScroll = maxSignalsTime - graph['zoom']
     return maxScroll
 
-def drawGraph():
-    linking = st.session_state['linkGraphs']
-    firstGraph = st.session_state['firstGraph']
-    secondGraph = st.session_state['secondGraph']
-    firstPlay = st.session_state['firstGraph']['play']
-    secondPlay = st.session_state['secondGraph']['play']
-    if linking:        
+def drawGraph(): # Draws the graph
+    linking = st.session_state['linkGraphs'] # Get the linking state
+    firstGraph = st.session_state['firstGraph'] # Get the first graph
+    secondGraph = st.session_state['secondGraph']# Get the second graph
+    firstPlay = st.session_state['firstGraph']['play'] # Get the first graph play state
+    secondPlay = st.session_state['secondGraph']['play'] # Get the second graph play state
+    if linking:         # If the graphs are linked
         firstZoom    = firstGraph['zoom']
         firstScroll  = firstGraph['scroll']
         firstSpeed   = firstGraph['speed']
 
-        drawPlot('firstGraph', True)
+        drawPlot('firstGraph', True) # Draw the first graph
         drawPlot('secondGraph', True, firstZoom, firstScroll, firstSpeed)
 
-        maxScrollFirst = getMaxScroll(firstGraph)
+        maxScrollFirst = getMaxScroll(firstGraph) 
         maxScrollSecond = getMaxScroll(secondGraph)
 
         if firstPlay:
@@ -247,22 +255,22 @@ def drawGraph():
         drawPlot('firstGraph', False)
         drawPlot('secondGraph', False)
 
-def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0):
+def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0): # Draws a plot
     graph = st.session_state[graphName]
     if len(graph['data']) == 0:
         st.write('No signals to plot')
         return
 
-    if not linking or graphName == 'firstGraph':
+    if not linking or graphName == 'firstGraph': # If the graphs are not linked or this is the first graph
         zoom = graph['zoom']
         scroll = graph['scroll']
         speed = graph['speed']
 
-    # Using plotly
-    fig = go.Figure()
-    for signal in graph['data']:
+    # Using plotly to draw the graph
+    fig = go.Figure() # Create a figure
+    for signal in graph['data']: # Add all the signals to the figure
         fig.add_trace(go.Scatter(x=signal['data']['Time'], y=signal['data']['Signal'], name=signal['label'], visible=signal['visible'], line=dict(color=signal['color'])))
-    
+    # Set the layout
     fig.update_layout(
         xaxis=dict(
             range=[scroll, scroll+zoom],
