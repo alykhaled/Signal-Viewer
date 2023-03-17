@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
-import matplotlib.pyplot as plt
-import altair as alt
-import plotly.express as px
 import plotly.graph_objects as go
+from fpdf import FPDF
+
+
 
 # signal = {
 #     data: data
@@ -43,6 +43,7 @@ def updateGraph(graphName):
 def tabs(tab,graph):
     graphName = graph
     graph = st.session_state[graph]
+
     tab.write('Upload Signal')
     uploaded_file = tab.file_uploader("Choose a file", type="csv", key="file"+graphName)
     if uploaded_file is not None:
@@ -56,6 +57,7 @@ def tabs(tab,graph):
             }
             st.session_state[graphName]['data'].append(signal)
 
+    # Signal Settings Controls
     tab.header('Signal Settings')
     labels = [signal['label'] for signal in graph['data']]
     selectedSignalLabel = tab.selectbox('Select Signal', labels, key="selectSignal"+graphName, args=(graphName,))
@@ -66,20 +68,16 @@ def tabs(tab,graph):
             break
     
     label = tab.text_input('Label', value=selectedSignalLabel, key="label"+graphName, on_change=updateSignal, args=(graphName,))
-
     color = tab.color_picker('Color', value=st.session_state['selectedSignal'+graphName]['color'], key="color"+graphName, on_change=updateSignal, args=(graphName,))
-
     visible = tab.checkbox('Visible', value=st.session_state['selectedSignal'+graphName]['visible'], key="visible"+graphName, on_change=updateSignal, args=(graphName,))
 
-    linking = st.session_state['linkGraphs']
-       
+    # Graph Settings Controls
     tab.header('Graph Settings')
+    linking = st.session_state['linkGraphs']
+    maxSignalsTime = 0
     if len(graph['data']) > 0:
         maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
-    else:
-        maxSignalsTime = 0
-
-    maxScroll = maxSignalsTime - graph['zoom']
+    maxScroll = getMaxScroll(graph)
     speed = tab.slider('Speed', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=10, value=st.session_state[graphName]['speed'], key="speed"+graphName, on_change=updateGraph, args=(graphName,))
     scroll = tab.slider('Scroll',disabled= (linking and graphName == 'secondGraph'), min_value=0.0, max_value=float(maxScroll+1.1), value=float(st.session_state[graphName]['scroll']), key="scroll"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
     zoom = tab.slider('Zoom', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state[graphName]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
@@ -124,10 +122,97 @@ def sidebar():
                                     }
 
     linkGraphs = st.sidebar.checkbox('Link Graphs', key='linkGraphs')
+    pdfButton = st.sidebar.button('Download PDF', key='pdfButton')
     tab1, tab2 = st.sidebar.tabs(['First Graph', 'Second Graph'])
 
     tabs(tab1,'firstGraph')
     tabs(tab2,'secondGraph')
+
+    firstGraphData = st.session_state['firstGraph']['data']
+    secondGraphData = st.session_state['secondGraph']['data']
+
+    if pdfButton:
+        createPDF(firstGraphData, secondGraphData)
+
+def getGraphData(data):
+    mean = []
+    std = []
+    duration = []
+    minData = []
+    maxData = []
+    for signal in data:
+        signalData = np.array(signal['data']['Signal'], dtype=np.float64)
+        T = np.array(signal['data']['Time'], dtype=np.float64)
+        mean.append(np.around(np.mean(signalData),decimals=4))
+        std.append(np.around(np.std(signalData),decimals=4))
+        duration.append(np.around(T[-1]-T[0],decimals=4))
+        minData.append(np.around(np.min(signalData),decimals=4))
+        maxData.append(np.around(np.max(signalData),decimals=4))
+    return mean,std,duration,minData,maxData
+    
+
+def createPDF(firstGraphData, secondGraphData):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="First Graph", ln=1, align="L")
+    mean,std,duration,minData,maxData = getGraphData(firstGraphData)
+    # Draw a table with 4 columns and row for each signal
+    pdf.cell(40, 10, txt="Signal", ln=0, align="L")
+    pdf.cell(40, 10, txt="Mean", ln=0, align="L")
+    pdf.cell(40, 10, txt="Std", ln=0, align="L")
+    pdf.cell(40, 10, txt="Duration", ln=0, align="L")
+    pdf.cell(40, 10, txt="Min", ln=0, align="L")
+    pdf.cell(40, 10, txt="Max", ln=1, align="L")
+    signalNames = [signal['label'] for signal in firstGraphData]
+    for i in range(len(mean)):
+        pdf.cell(40, 10, txt=str(signalNames[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(mean[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(std[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(duration[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(minData[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(maxData[i]), ln=1, align="L")
+    
+
+    # Print current state
+    pdf.cell(200, 10, txt="Current State", ln=1, align="L")
+    pdf.cell(40, 10, txt="Scroll: "+str(st.session_state['firstGraph']['scroll']), ln=0, align="L")
+    pdf.cell(40, 10, txt="Zoom: "+str(st.session_state['firstGraph']['zoom']), ln=0, align="L")
+
+    # Add horizontal line
+    pdf.cell(200, 10, txt="", ln=1, align="L")
+    pdf.cell(200, 10, txt="Second Graph", ln=1, align="L")
+    mean,std,duration,minData,maxData = getGraphData(secondGraphData)
+    # Draw a table with 4 columns and row for each signal
+    pdf.cell(40, 10, txt="Signal", ln=0, align="L")
+    pdf.cell(40, 10, txt="Mean", ln=0, align="L")
+    pdf.cell(40, 10, txt="Std", ln=0, align="L")
+    pdf.cell(40, 10, txt="Duration", ln=0, align="L")
+    pdf.cell(40, 10, txt="Min", ln=0, align="L")
+    pdf.cell(40, 10, txt="Max", ln=1, align="L")
+    for i in range(len(mean)):
+        pdf.cell(40, 10, txt=str(i+1), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(mean[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(std[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(duration[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(minData[i]), ln=0, align="L")
+        pdf.cell(40, 10, txt=str(maxData[i]), ln=1, align="L")
+    
+    # Print current state
+    pdf.cell(200, 10, txt="Current State", ln=1, align="L")
+    pdf.cell(40, 10, txt="Scroll: "+str(st.session_state['secondGraph']['scroll']), ln=0, align="L")
+    pdf.cell(40, 10, txt="Zoom: "+str(st.session_state['secondGraph']['zoom']), ln=0, align="L")
+
+    pdf.output("report.pdf")
+
+
+def getMaxScroll(graph):
+    if len(graph['data']) > 0:
+        maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
+    else:
+        maxSignalsTime = 0
+    maxScroll = maxSignalsTime - graph['zoom']
+    return maxScroll
 
 def drawGraph():
     linking = st.session_state['linkGraphs']
@@ -143,42 +228,24 @@ def drawGraph():
         drawPlot('firstGraph', True)
         drawPlot('secondGraph', True, firstZoom, firstScroll, firstSpeed)
 
-        if len(firstGraph['data']) > 0:
-            maxSignalsTimeFirst = max([signal['data']['Time'].max() for signal in firstGraph['data']])
-        else:
-            maxSignalsTimeFirst = 0
-        maxScrollFirst = maxSignalsTimeFirst - firstZoom
-
-        if len(secondGraph['data']) > 0:
-            maxSignalsTimeSecond = max([signal['data']['Time'].max() for signal in secondGraph['data']])
-        else:
-            maxSignalsTimeSecond = 0
-        maxScrollSecond = maxSignalsTimeSecond - firstZoom
+        maxScrollFirst = getMaxScroll(firstGraph)
+        maxScrollSecond = getMaxScroll(secondGraph)
 
         if firstPlay:
-            time.sleep(0.1)
+            time.sleep(firstSpeed)
             if firstGraph['scroll'] < maxScrollFirst:
-                st.session_state['firstGraph']['scroll'] += firstSpeed
+                st.session_state['firstGraph']['scroll'] += 0.1
             else:
                 st.session_state['firstGraph']['play'] = False
 
             if secondGraph['scroll'] < maxScrollSecond:
-                st.session_state['secondGraph']['scroll'] += firstSpeed
+                st.session_state['secondGraph']['scroll'] += 0.1
             else:
                 st.session_state['secondGraph']['play'] = False
             st.experimental_rerun()
     else:
         drawPlot('firstGraph', False)
         drawPlot('secondGraph', False)
-
-def animate(df):
-    lines = alt.Chart(df).mark_line().encode(
-        x=alt.X('Time', scale=alt.Scale(zero=False, domain=(scroll, scroll+zoom))),
-        y=alt.Y('Signal', scale=alt.Scale(zero=False))
-    ).properties(
-        width=800,
-        height=400
-    )
 
 def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0):
     graph = st.session_state[graphName]
@@ -221,12 +288,9 @@ def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0):
             st.session_state[graphName]['play'] = False
         st.experimental_rerun()
 
-
-
 def main():
     st.title('Signal Viewer :heart:')
     sidebar()
     drawGraph()
-    # drawGraph("secondGraph")
 if __name__ == '__main__':
     main()
