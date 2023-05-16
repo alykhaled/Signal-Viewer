@@ -55,7 +55,7 @@ def tabs(tab,graph):
             st.session_state.signals.append(uploaded_file)
             signal = {
                 'data': pd.read_csv(uploaded_file),
-                'color': '#000000',
+                'color': '#ffffff',
                 'label': 'Signal ' + str(len(graph['data']) + 1),
                 'visible': True
             }
@@ -97,7 +97,7 @@ def sidebar():
     if 'selectedSignalFirstGraph' not in st.session_state:
         st.session_state.selectedSignalfirstGraph = {
                                             'data': [],
-                                            'color': '#000000',
+                                            'color': '#ffffff',
                                             'label': 'Signal 1',
                                             'visible': True
                                             }
@@ -129,7 +129,8 @@ def sidebar():
                                     }
 
     linkGraphs = st.sidebar.checkbox('Link Graphs', key='linkGraphs')
-    pdfButton = st.sidebar.button('Download PDF', key='pdfButton')
+    #pdfButton = st.sidebar.button('Download PDF', key='pdfButton')
+    pdfButton = st.sidebar.download_button(label="Download report", data='pdf', file_name='Report.pdf')
     tab1, tab2 = st.sidebar.tabs(['First Graph', 'Second Graph'])
 
     tabs(tab1,'firstGraph')
@@ -277,7 +278,8 @@ def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0): # Draws a plot
             constrain='domain'
         ),
         width=800,
-        height=400
+        height=400,
+        margin=dict(t=30, b=130)
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -297,8 +299,26 @@ def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0): # Draws a plot
         st.experimental_rerun()
 
 def main():
-    st.title('Signal Viewer :heart:')
+    #st.title('Signal Viewer')    
+    #st.title.markdown(signature, unsafe_allow_html=True)
+
+    # Add custom CSS to the Streamlit app
+    st.markdown(
+    """
+    <style>
+    /* CSS selector for the title class */
+    .title-class {
+        padding-top: 0;
+        margin-top: -75px;
+        margin-bottom: -55px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
+    st.markdown('<h1 class="title-class">Signal Viewer</h1>', unsafe_allow_html=True)
     sidebar()
     drawGraph()
 if __name__ == '__main__':
     main()
+
