@@ -35,13 +35,13 @@ def updateGraph(graphName):
         for graph in ['firstGraph','secondGraph']:
             st.session_state[graph]['speed'] = st.session_state['speed'+graph]
             st.session_state[graph]['scroll'] = st.session_state['scroll'+graph]  if 'scroll'+graph in st.session_state else 0
+            st.session_state[graph]['scrollY'] = st.session_state['scrollY'+graph] if 'scrollY'+graph in st.session_state else 0 
             st.session_state[graph]['zoom'] = st.session_state['zoom'+graph] 
-            st.session_state[graph]['play'] = st.session_state['play'+graph]
     else:
         st.session_state[graphName]['speed'] = st.session_state['speed'+graphName]
         st.session_state[graphName]['scroll'] = st.session_state['scroll'+graphName] if 'scroll'+graphName in st.session_state else 0
+        st.session_state[graphName]['scrollY'] = st.session_state['scrollY'+graphName] if 'scrollY'+graphName in st.session_state else 0
         st.session_state[graphName]['zoom'] = st.session_state['zoom'+graphName]
-        st.session_state[graphName]['play'] = st.session_state['play'+graphName]
 
 #tabs is used to create the tabs for the sidebar       
 def tabs(tab,graph):
@@ -84,9 +84,18 @@ def tabs(tab,graph):
         maxSignalsTime = max([signal['data']['Time'].max() for signal in graph['data']])
     maxScroll = getMaxScroll(graph)
     speed = tab.slider('Speed', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=10, value=st.session_state[graphName]['speed'], key="speed"+graphName, on_change=updateGraph, args=(graphName,))
-    scroll = tab.slider('Scroll',disabled= (linking and graphName == 'secondGraph'), min_value=0.0, max_value=float(maxScroll+1.1), value=float(st.session_state[graphName]['scroll']), key="scroll"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
+    scroll = tab.slider('Pan X',disabled= (linking and graphName == 'secondGraph'), min_value=0.0, max_value=float(maxScroll+1.1), value=float(st.session_state[graphName]['scroll']), key="scroll"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
+    scrollY = tab.slider('Pan Y', disabled= (linking and graphName == 'secondGraph'),  min_value=-2.0, max_value=2.0, value=float(st.session_state[graphName]['scrollY']), key="scrollY"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
     zoom = tab.slider('Zoom', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state[graphName]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
-    play = tab.checkbox('Play', disabled= (linking and graphName == 'secondGraph'),  value=st.session_state[graphName]['play'], key="play"+graphName, on_change=updateGraph, args=(graphName,))
+    play = tab.button('Play', disabled= (linking and graphName == 'secondGraph'), key="play"+graphName)
+    stop = tab.button('Stop', disabled= (linking and graphName == 'secondGraph'), key="stop"+graphName)
+    if play:
+        st.session_state[graphName]['play'] = True
+        st.session_state[graphName]['stop'] = False
+
+    if stop:
+        st.session_state[graphName]['play'] = False
+        st.session_state[graphName]['stop'] = True
 
 #sidebar is used to create the sidebar
 def sidebar(): 
@@ -115,6 +124,7 @@ def sidebar():
                                         'data': [],
                                         'speed': 1,
                                         'scroll': 0,
+                                        'scrollY': 0,
                                         'zoom': 1,
                                         'play': False,
                                     }
@@ -124,23 +134,27 @@ def sidebar():
                                         'data': [],
                                         'speed': 1,
                                         'scroll': 0,
+                                        'scrollY': 0,
                                         'zoom': 1,
                                         'play': False,
                                     }
 
+    firstGraphData = st.session_state['firstGraph']['data']
+    secondGraphData = st.session_state['secondGraph']['data']
+
     linkGraphs = st.sidebar.checkbox('Link Graphs', key='linkGraphs')
+    pdf = createPDF(firstGraphData, secondGraphData)
     #pdfButton = st.sidebar.button('Download PDF', key='pdfButton')
-    pdfButton = st.sidebar.download_button(label="Download report", data='pdf', file_name='Report.pdf')
+    pdfButton = st.sidebar.download_button(label="Download report", data=pdf, file_name='Report.pdf')
+    
     tab1, tab2 = st.sidebar.tabs(['First Graph', 'Second Graph'])
 
     tabs(tab1,'firstGraph')
     tabs(tab2,'secondGraph')
 
-    firstGraphData = st.session_state['firstGraph']['data']
-    secondGraphData = st.session_state['secondGraph']['data']
 
-    if pdfButton:
-        createPDF(firstGraphData, secondGraphData)
+    # if pdfButton:
+        # createPDF(firstGraphData, secondGraphData)
 
 def getGraphData(data):
     mean = []
@@ -212,7 +226,8 @@ def createPDF(firstGraphData, secondGraphData): #creating a pdf file with the da
     pdf.cell(40, 10, txt="Scroll: "+str(st.session_state['secondGraph']['scroll']), ln=0, align="L")
     pdf.cell(40, 10, txt="Zoom: "+str(st.session_state['secondGraph']['zoom']), ln=0, align="L")
 
-    pdf.output("report.pdf")
+    # return binary pdf
+    return pdf.output(dest='S').encode('latin-1')
 
 
 def getMaxScroll(graph): # Returns the maximum scroll value for a graph to prevent scrolling past the end of the data
@@ -222,6 +237,15 @@ def getMaxScroll(graph): # Returns the maximum scroll value for a graph to preve
         maxSignalsTime = 0
     maxScroll = maxSignalsTime - graph['zoom']
     return maxScroll
+
+def getMaxYScroll(graph): # Returns the maximum scroll value for a graph to prevent scrolling past the end of the data
+    if len(graph['data']) > 0:
+        maxSignalsTime = max([signal['data']['Signal'].max() for signal in graph['data']])
+    else:
+        maxSignalsTime = 0
+    maxScroll = maxSignalsTime - graph['zoom']
+    return maxScroll
+
 
 def drawGraph(): # Draws the graph
     linking = st.session_state['linkGraphs'] # Get the linking state
@@ -233,9 +257,10 @@ def drawGraph(): # Draws the graph
         firstZoom    = firstGraph['zoom']
         firstScroll  = firstGraph['scroll']
         firstSpeed   = firstGraph['speed']
+        firstScrollY = firstGraph['scrollY']
 
         drawPlot('firstGraph', True) # Draw the first graph
-        drawPlot('secondGraph', True, firstZoom, firstScroll, firstSpeed)
+        drawPlot('secondGraph', True, firstZoom, firstScroll, firstSpeed, firstScrollY)
 
         maxScrollFirst = getMaxScroll(firstGraph) 
         maxScrollSecond = getMaxScroll(secondGraph)
@@ -256,7 +281,7 @@ def drawGraph(): # Draws the graph
         drawPlot('firstGraph', False)
         drawPlot('secondGraph', False)
 
-def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0): # Draws a plot
+def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0, scrollY=0): # Draws a plot
     graph = st.session_state[graphName]
     if len(graph['data']) == 0:
         st.write('No signals to plot')
@@ -265,16 +290,24 @@ def drawPlot(graphName, linking, zoom=0, scroll=0, speed=0): # Draws a plot
     if not linking or graphName == 'firstGraph': # If the graphs are not linked or this is the first graph
         zoom = graph['zoom']
         scroll = graph['scroll']
+        scrollY = graph['scrollY']
         speed = graph['speed']
+
 
     # Using plotly to draw the graph
     fig = go.Figure() # Create a figure
     for signal in graph['data']: # Add all the signals to the figure
+        maxScrollY = max([signal['data']['Signal'].max() for signal in graph['data']])
+        minScrollY = min([signal['data']['Signal'].min() for signal in graph['data']])
         fig.add_trace(go.Scatter(x=signal['data']['Time'], y=signal['data']['Signal'], name=signal['label'], visible=signal['visible'], line=dict(color=signal['color'])))
     # Set the layout
     fig.update_layout(
         xaxis=dict(
             range=[scroll, scroll+zoom],
+            constrain='domain'
+        ),
+        yaxis=dict(
+            range=[minScrollY+scrollY, maxScrollY+scrollY],
             constrain='domain'
         ),
         width=800,
@@ -321,4 +354,3 @@ def main():
     drawGraph()
 if __name__ == '__main__':
     main()
-
