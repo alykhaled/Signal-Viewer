@@ -6,6 +6,8 @@ import plotly.graph_objects as go
 from fpdf import FPDF
 from PIL import Image
 from io import BytesIO
+import matplotlib.pyplot as plt
+import os
 
 
 
