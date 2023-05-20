@@ -4,6 +4,8 @@ import numpy as np
 import time
 import plotly.graph_objects as go
 from fpdf import FPDF
+from PIL import Image
+from io import BytesIO
 
 
 
@@ -88,7 +90,7 @@ def tabs(tab,graph):
     scrollY = tab.slider('Pan Y', disabled= (linking and graphName == 'secondGraph'),  min_value=-2.0, max_value=2.0, value=float(st.session_state[graphName]['scrollY']), key="scrollY"+graphName, on_change=updateGraph, args=(graphName,), step=0.1)
     zoom = tab.slider('Zoom', disabled= (linking and graphName == 'secondGraph'),  min_value=1, max_value=int(maxSignalsTime-1), value=st.session_state[graphName]['zoom'], key="zoom"+graphName, on_change=updateGraph, args=(graphName,))
     play = tab.button('Play', disabled= (linking and graphName == 'secondGraph'), key="play"+graphName)
-    stop = tab.button('Stop', disabled= (linking and graphName == 'secondGraph'), key="stop"+graphName)
+    stop = tab.button('Pause', disabled= (linking and graphName == 'secondGraph'), key="stop"+graphName)
     if play:
         st.session_state[graphName]['play'] = True
         st.session_state[graphName]['stop'] = False
@@ -201,6 +203,57 @@ def createPDF(firstGraphData, secondGraphData): #creating a pdf file with the da
     pdf.cell(200, 10, txt="Current State", ln=1, align="L")
     pdf.cell(40, 10, txt="Scroll: "+str(st.session_state['firstGraph']['scroll']), ln=0, align="L")
     pdf.cell(40, 10, txt="Zoom: "+str(st.session_state['firstGraph']['zoom']), ln=0, align="L")
+
+    
+    graph = st.session_state['firstGraph']
+    
+
+    if(len(graph['data']) != 0):
+        zoom = graph['zoom']
+        scroll = graph['scroll']
+        scrollY = graph['scrollY']
+        fig = go.Figure() # Create a figure
+        for signal in graph['data']: # Add all the signals to the figure
+            maxScrollY = max([signal['data']['Signal'].max() for signal in graph['data']])
+            minScrollY = min([signal['data']['Signal'].min() for signal in graph['data']])
+            fig.add_trace(go.Scatter(x=signal['data']['Time'], y=signal['data']['Signal'], name=signal['label'], visible=signal['visible'], line=dict(color=signal['color'])))
+        # Set the layout
+        fig.update_layout(
+            xaxis=dict(
+                range=[scroll, scroll+zoom],
+                constrain='domain'
+            ),
+            yaxis=dict(
+                range=[minScrollY+scrollY, maxScrollY+scrollY],
+                constrain='domain'
+            ),
+            width=800,
+            height=400,
+            margin=dict(t=30, b=130)
+        )
+
+        # # Step 2: Save Plotly chart as image in memory
+        # image_bytes = fig.to_image(format='png')
+
+        # # Step 3: Open the image using PIL
+        # image = Image.open(BytesIO(image_bytes))
+
+        # # Step 4: Resize the image if necessary
+        # new_width, new_height = 400, 300  # Specify the desired dimensions
+        # image = image.resize((new_width, new_height))
+
+        # image = image.convert("RGB")
+        # pdf.image(image, x=10, y=10, w=new_width, h=new_height)
+#     left = 100
+#     top = 100
+#     right = 500
+#     bottom = 500
+
+#     # Capture the screen within the specified coordinates
+#     screenshot = Image.grab(bbox=(left, top, right, bottom))
+
+# # Save the captured screen to a file
+#     screenshot.save("screenshot.png")
 
     # Add horizontal line
     pdf.cell(200, 10, txt="", ln=1, align="L")
